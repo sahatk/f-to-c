@@ -1,0 +1,5 @@
+Access to fetch at 'https://f-to-c.netlify.app/.netlify/functions/claude-proxy' from origin 'null' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+VM15423:6
+
+
+           POST https://f-to-c.netlify.app/.netlify/functions/claude-proxy net::ERR_FAILED

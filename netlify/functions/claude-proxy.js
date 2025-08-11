@@ -8,19 +8,21 @@ exports.handler = async function (event, context) {
     method: event.httpMethod,
     path: event.path,
     headers: event.headers,
-    body: event.body
+    body: event.body,
   });
 
   // CORS 헤더 설정 (Figma 플러그인 환경에 최적화)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS, PUT, DELETE",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-API-Key, X-Anthropic-Version, X-Target-URL, Origin, Accept, User-Agent",
     "Access-Control-Max-Age": "86400",
-    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Allow-Credentials": "false", // "*" 오리진과 함께 사용할 때는 false여야 함
     "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0"
+    Pragma: "no-cache",
+    Expires: "0",
+    Vary: "Origin",
   };
 
   // OPTIONS 요청 처리 (preflight)
@@ -59,7 +61,7 @@ exports.handler = async function (event, context) {
           success: true,
           message: "프록시 서버가 정상 작동합니다",
           timestamp: new Date().toISOString(),
-          test: true
+          test: true,
         }),
       };
     }

@@ -1,10 +1,10 @@
 [build]
   # Functions 디렉토리 지정 (상대 경로 수정)
   functions = "netlify/functions"
-  
+
   # 빌드 명령어 (필요한 경우)
   # command = "npm run build"
-  
+
   # 빌드 출력 디렉토리 (필요한 경우)
   # publish = "."
 
@@ -44,10 +44,11 @@
   for = "/.netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
-    Access-Control-Allow-Headers = "*"
-    Access-Control-Allow-Credentials = "true"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS, PUT, DELETE"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-API-Key, X-Anthropic-Version, X-Target-URL, Origin, Accept, User-Agent"
+    Access-Control-Allow-Credentials = "false"
     Access-Control-Max-Age = "86400"
+    Vary = "Origin"
 
 # 보안 헤더 설정
 [[headers]]

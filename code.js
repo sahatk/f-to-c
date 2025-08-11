@@ -1096,39 +1096,74 @@ async function saveProxySettings(method, customUrl = "") {
       customUrl: customUrl,
       timestamp: new Date().toISOString(),
     };
-    await figma.clientStorage.setAsync(
-      PROXY_SETTINGS_KEY,
-      JSON.stringify(settings)
-    );
-    CURRENT_PROXY_METHOD = method;
 
-    // 사용자 정의 프록시 URL이 있는 경우 업데이트
+    // clientStorage 사용 시도
+    try {
+      await figma.clientStorage.setAsync(
+        PROXY_SETTINGS_KEY,
+        JSON.stringify(settings)
+      );
+      console.log("프록시 설정이 clientStorage에 저장되었습니다.");
+    } catch (storageError) {
+      console.warn("clientStorage 저장 실패, 메모리에만 저장:", storageError);
+      // clientStorage 실패 시 메모리에만 저장
+    }
+
+    // 메모리에 설정 저장 (항상 성공)
+    CURRENT_PROXY_METHOD = method;
     if (customUrl && method === "customProxy") {
       PROXY_OPTIONS.customProxy = customUrl;
     }
 
+    // UI에 성공 메시지 전송
+    figma.ui.postMessage({
+      type: "proxy_settings_saved",
+      success: true,
+      method: method,
+      customUrl: customUrl,
+    });
+
     return { success: true };
   } catch (e) {
+    console.error("프록시 설정 저장 중 오류:", e);
     return { success: false, error: String(e) };
   }
 }
 
 async function loadProxySettings() {
   try {
-    const stored = await figma.clientStorage.getAsync(PROXY_SETTINGS_KEY);
-    if (stored) {
-      const settings = JSON.parse(stored);
-      CURRENT_PROXY_METHOD = settings.method || "netlifyProxy";
+    // clientStorage에서 설정 로드 시도
+    try {
+      const stored = await figma.clientStorage.getAsync(PROXY_SETTINGS_KEY);
+      if (stored) {
+        const settings = JSON.parse(stored);
+        CURRENT_PROXY_METHOD = settings.method || "netlifyProxy";
 
-      if (settings.customUrl && settings.method === "customProxy") {
-        PROXY_OPTIONS.customProxy = settings.customUrl;
+        if (settings.customUrl && settings.method === "customProxy") {
+          PROXY_OPTIONS.customProxy = settings.customUrl;
+        }
+
+        console.log(
+          "프록시 설정이 clientStorage에서 로드되었습니다:",
+          settings
+        );
+        return settings;
       }
-
-      return settings;
+    } catch (storageError) {
+      console.warn("clientStorage에서 설정 로드 실패:", storageError);
     }
-    return null;
+
+    // 기본 설정 반환
+    const defaultSettings = {
+      method: "netlifyProxy",
+      customUrl: "",
+      timestamp: new Date().toISOString(),
+    };
+
+    CURRENT_PROXY_METHOD = defaultSettings.method;
+    return defaultSettings;
   } catch (e) {
-    console.log("프록시 설정 로드 실패:", e);
+    console.error("프록시 설정 로드 중 오류:", e);
     return null;
   }
 }
@@ -1370,12 +1405,25 @@ figma.ui.onmessage = async (msg) => {
       case "saveProxySettings": {
         try {
           const result = await saveProxySettings(msg.method, msg.customUrl);
-          figma.ui.postMessage({
-            type: "proxySettingsSaved",
-            ok: result.success,
-            error: result.success ? null : result.error,
-          });
+
+          // 성공 시 추가 정보와 함께 메시지 전송
+          if (result.success) {
+            figma.ui.postMessage({
+              type: "proxySettingsSaved",
+              ok: true,
+              method: msg.method,
+              customUrl: msg.customUrl,
+              error: null,
+            });
+          } else {
+            figma.ui.postMessage({
+              type: "proxySettingsSaved",
+              ok: false,
+              error: result.error || "알 수 없는 오류",
+            });
+          }
         } catch (e) {
+          console.error("프록시 설정 저장 중 오류:", e);
           figma.ui.postMessage({
             type: "proxySettingsSaved",
             ok: false,

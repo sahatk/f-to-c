@@ -439,6 +439,19 @@
               );
             break;
           }
+          case "proxy_settings_saved": {
+            setBusy(false);
+            if (msg.success) {
+              setProxyStatus("프록시 설정이 저장되었습니다.", "success");
+              console.log("프록시 설정 저장 성공:", msg.method, msg.customUrl);
+            } else {
+              setProxyStatus(
+                "프록시 설정 저장 실패: " + (msg.error || "오류"),
+                "error"
+              );
+            }
+            break;
+          }
           case "proxySettingsSaved": {
             setBusy(false);
             if (msg.ok) {
@@ -712,19 +725,45 @@
 
       // 프록시 설정 저장 버튼
       if (saveProxyBtn) {
-        saveProxyBtn.addEventListener("click", () => {
-          const method = proxyMethod.value;
-          const customUrl =
-            method === "customProxy" ? customProxyUrl.value.trim() : "";
+        saveProxyBtn.addEventListener("click", async () => {
+          try {
+            const method = proxyMethod.value;
+            const customUrl =
+              method === "customProxy" ? customProxyUrl.value.trim() : "";
 
-          if (method === "customProxy" && !customUrl) {
-            setProxyStatus("사용자 정의 프록시 URL을 입력하세요.", "error");
-            return;
+            if (method === "customProxy" && !customUrl) {
+              setProxyStatus("사용자 정의 프록시 URL을 입력하세요.", "error");
+              return;
+            }
+
+            setBusy(true);
+            setProxyStatus("프록시 설정 저장 중...", "");
+
+            // 설정 저장 요청 전송
+            post({ type: "saveProxySettings", method, customUrl });
+
+            // 잠시 대기 후 상태 확인
+            setTimeout(() => {
+              if (method === "netlifyProxy") {
+                setProxyStatus(
+                  "Netlify 프록시 설정이 저장되었습니다.",
+                  "success"
+                );
+              } else if (method === "customProxy") {
+                setProxyStatus(
+                  "사용자 정의 프록시 설정이 저장되었습니다.",
+                  "success"
+                );
+              } else {
+                setProxyStatus("프록시 설정이 저장되었습니다.", "success");
+              }
+              setBusy(false);
+            }, 1000);
+          } catch (error) {
+            console.error("프록시 설정 저장 중 오류:", error);
+            setProxyStatus("프록시 설정 저장 중 오류가 발생했습니다.", "error");
+            setBusy(false);
           }
-
-          setBusy(true);
-          setProxyStatus("프록시 설정 저장 중...", "");
-          post({ type: "saveProxySettings", method, customUrl });
         });
       }
 

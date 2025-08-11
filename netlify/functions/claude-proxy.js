@@ -3,13 +3,13 @@
 // 배포 방법: netlify/functions/ 폴더에 파일을 생성하고 Netlify에 배포
 
 exports.handler = async function (event, context) {
-  // CORS 헤더 설정
+  // CORS 헤더 설정 (Figma 플러그인 환경에 최적화)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers":
-      "Content-Type, X-API-Key, X-Anthropic-Version, X-Target-URL",
+    "Access-Control-Allow-Headers": "*",
     "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Credentials": "true",
   };
 
   // OPTIONS 요청 처리 (preflight)
@@ -32,7 +32,26 @@ exports.handler = async function (event, context) {
 
   try {
     // 요청 본문 파싱
-    const requestBody = JSON.parse(event.body);
+    let requestBody = {};
+    try {
+      requestBody = JSON.parse(event.body || "{}");
+    } catch (parseError) {
+      console.log("요청 본문 파싱 실패, 빈 객체 사용:", parseError);
+    }
+
+    // 테스트 요청 처리
+    if (requestBody.test === true) {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: true,
+          message: "프록시 서버가 정상 작동합니다",
+          timestamp: new Date().toISOString(),
+          test: true
+        }),
+      };
+    }
 
     // API 키 추출
     const apiKey = event.headers["x-api-key"] || event.headers["X-API-Key"];

@@ -1113,10 +1113,18 @@ async function saveProxySettings(method, customUrl = "") {
     if (customUrl) {
       if (method === "customProxy") {
         PROXY_OPTIONS.customProxy = customUrl;
+        console.log("사용자 정의 프록시 URL 설정:", customUrl);
       } else if (method === "netlifyProxy") {
         PROXY_OPTIONS.netlifyProxy = customUrl;
+        console.log("Netlify 프록시 URL 설정:", customUrl);
       }
     }
+    
+    console.log("현재 프록시 설정:", {
+      method: CURRENT_PROXY_METHOD,
+      url: PROXY_OPTIONS[CURRENT_PROXY_METHOD],
+      allOptions: PROXY_OPTIONS
+    });
 
     // UI에 성공 메시지 전송
     figma.ui.postMessage({
@@ -1188,33 +1196,65 @@ async function testProxyConnection(proxyMethod) {
 
     console.log(`프록시 연결 테스트 시작: ${proxyMethod} -> ${proxyUrl}`);
 
-    // Netlify Functions는 POST 요청을 기대하므로 POST로 테스트
-    const testResponse = await fetch(proxyUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({
-        test: true,
-        message: "프록시 연결 테스트",
-      }),
-    });
+    // 타임아웃 설정 (10초)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    console.log(
-      `프록시 응답 상태: ${testResponse.status} ${testResponse.statusText}`
-    );
+    try {
+      // Netlify Functions는 POST 요청을 기대하므로 POST로 테스트
+      const testResponse = await fetch(proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "User-Agent": "Figma-Plugin/1.0",
+        },
+        body: JSON.stringify({
+          test: true,
+          message: "프록시 연결 테스트",
+          timestamp: new Date().toISOString(),
+        }),
+        signal: controller.signal,
+      });
 
-    return {
-      success: testResponse.ok,
-      status: testResponse.status,
-      statusText: testResponse.statusText,
-    };
+      clearTimeout(timeoutId);
+
+      console.log(
+        `프록시 응답 상태: ${testResponse.status} ${testResponse.statusText}`
+      );
+
+      // 응답 본문 확인
+      let responseBody = "";
+      try {
+        responseBody = await testResponse.text();
+        console.log("프록시 응답 본문:", responseBody);
+      } catch (bodyError) {
+        console.warn("응답 본문 읽기 실패:", bodyError);
+      }
+
+      return {
+        success: testResponse.ok,
+        status: testResponse.status,
+        statusText: testResponse.statusText,
+        body: responseBody,
+      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
+    }
   } catch (e) {
     console.error(`프록시 연결 테스트 실패 (${proxyMethod}):`, e);
+    
+    let errorMessage = e.message;
+    if (e.name === 'AbortError') {
+      errorMessage = "연결 시간 초과 (10초)";
+    } else if (e.message.includes('Failed to fetch')) {
+      errorMessage = "네트워크 연결 실패 - CORS 정책 또는 도메인 접근 권한 확인 필요";
+    }
+    
     return {
       success: false,
-      error: `연결 실패: ${e.message}`,
+      error: `연결 실패: ${errorMessage}`,
     };
   }
 }

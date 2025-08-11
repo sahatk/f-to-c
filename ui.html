@@ -489,12 +489,38 @@
           case "proxyConnectionTestResult": {
             setBusy(false);
             if (msg.ok) {
-              setProxyStatus(`프록시 연결 성공 (${msg.status})`, "success");
+              let statusMessage = `프록시 연결 성공 (${msg.status})`;
+              if (msg.body && msg.body.includes("프록시 서버가 정상 작동합니다")) {
+                statusMessage += " - 테스트 응답 확인됨";
+              }
+              setProxyStatus(statusMessage, "success");
+              
+              // 성공 시 콘솔에 상세 정보 출력
+              console.log("프록시 연결 테스트 성공:", {
+                status: msg.status,
+                statusText: msg.statusText,
+                body: msg.body
+              });
             } else {
-              setProxyStatus(
-                "프록시 연결 실패: " + (msg.error || "오류"),
-                "error"
-              );
+              let errorMessage = msg.error || "오류";
+              
+              // 에러 메시지 개선
+              if (errorMessage.includes("CORS 정책")) {
+                errorMessage += " - manifest.json의 allowedDomains 확인 필요";
+              } else if (errorMessage.includes("시간 초과")) {
+                errorMessage += " - 네트워크 상태 또는 프록시 서버 응답 지연";
+              } else if (errorMessage.includes("Failed to fetch")) {
+                errorMessage += " - 브라우저 정책 또는 네트워크 접근 권한 문제";
+              }
+              
+              setProxyStatus(`프록시 연결 실패: ${errorMessage}`, "error");
+              
+              // 실패 시 콘솔에 상세 정보 출력
+              console.error("프록시 연결 테스트 실패:", {
+                error: msg.error,
+                status: msg.status,
+                statusText: msg.statusText
+              });
             }
             break;
           }

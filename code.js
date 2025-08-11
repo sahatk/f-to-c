@@ -1185,6 +1185,8 @@ async function loadProxySettings() {
 
 // 프록시 서버 상태 확인
 async function testProxyConnection(proxyMethod) {
+  let timeoutId = null; // 타임아웃 ID를 함수 상단에서 선언
+  
   try {
     const proxyUrl = PROXY_OPTIONS[proxyMethod];
     if (!proxyUrl) {
@@ -1196,14 +1198,11 @@ async function testProxyConnection(proxyMethod) {
 
     console.log(`프록시 연결 테스트 시작: ${proxyMethod} -> ${proxyUrl}`);
 
-    // 타임아웃 설정 (10초) - AbortController 대신 Promise.race 사용
+    // 타임아웃 설정 (10초) - Promise.race를 사용한 안전한 방식
     const timeoutPromise = new Promise((_, reject) => {
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         reject(new Error("연결 시간 초과 (10초)"));
       }, 10000);
-      
-      // 타임아웃 Promise에 cleanup 함수 추가
-      timeoutPromise.cleanup = () => clearTimeout(timeoutId);
     });
 
     try {
@@ -1221,13 +1220,14 @@ async function testProxyConnection(proxyMethod) {
           timestamp: new Date().toISOString(),
         }),
       });
-
+      
       // 타임아웃과 fetch 요청을 경쟁시킴
       const testResponse = await Promise.race([fetchPromise, timeoutPromise]);
       
       // 성공 시 타임아웃 정리
-      if (timeoutPromise.cleanup) {
-        timeoutPromise.cleanup();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
 
       console.log(
@@ -1251,17 +1251,25 @@ async function testProxyConnection(proxyMethod) {
       };
     } catch (fetchError) {
       // 에러 발생 시 타임아웃 정리
-      if (timeoutPromise.cleanup) {
-        timeoutPromise.cleanup();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
       throw fetchError;
     }
   } catch (e) {
+    // 최종 에러 처리에서도 타임아웃 정리
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    
     console.error(`프록시 연결 테스트 실패 (${proxyMethod}):`, e);
     
     let errorMessage = e.message;
     if (e.message.includes("연결 시간 초과")) {
-      errorMessage = "연결 시간 초과 (10초) - 네트워크 상태 또는 프록시 서버 응답 지연";
+      errorMessage =
+        "연결 시간 초과 (10초) - 네트워크 상태 또는 프록시 서버 응답 지연";
     } else if (e.message.includes("Failed to fetch")) {
       errorMessage =
         "네트워크 연결 실패 - CORS 정책 또는 도메인 접근 권한 확인 필요";

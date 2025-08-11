@@ -1119,11 +1119,11 @@ async function saveProxySettings(method, customUrl = "") {
         console.log("Netlify 프록시 URL 설정:", customUrl);
       }
     }
-    
+
     console.log("현재 프록시 설정:", {
       method: CURRENT_PROXY_METHOD,
       url: PROXY_OPTIONS[CURRENT_PROXY_METHOD],
-      allOptions: PROXY_OPTIONS
+      allOptions: PROXY_OPTIONS,
     });
 
     // UI에 성공 메시지 전송
@@ -1196,17 +1196,23 @@ async function testProxyConnection(proxyMethod) {
 
     console.log(`프록시 연결 테스트 시작: ${proxyMethod} -> ${proxyUrl}`);
 
-    // 타임아웃 설정 (10초)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // 타임아웃 설정 (10초) - AbortController 대신 Promise.race 사용
+    const timeoutPromise = new Promise((_, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("연결 시간 초과 (10초)"));
+      }, 10000);
+      
+      // 타임아웃 Promise에 cleanup 함수 추가
+      timeoutPromise.cleanup = () => clearTimeout(timeoutId);
+    });
 
     try {
       // Netlify Functions는 POST 요청을 기대하므로 POST로 테스트
-      const testResponse = await fetch(proxyUrl, {
+      const fetchPromise = fetch(proxyUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
           "User-Agent": "Figma-Plugin/1.0",
         },
         body: JSON.stringify({
@@ -1214,10 +1220,15 @@ async function testProxyConnection(proxyMethod) {
           message: "프록시 연결 테스트",
           timestamp: new Date().toISOString(),
         }),
-        signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
+      // 타임아웃과 fetch 요청을 경쟁시킴
+      const testResponse = await Promise.race([fetchPromise, timeoutPromise]);
+      
+      // 성공 시 타임아웃 정리
+      if (timeoutPromise.cleanup) {
+        timeoutPromise.cleanup();
+      }
 
       console.log(
         `프록시 응답 상태: ${testResponse.status} ${testResponse.statusText}`
@@ -1239,17 +1250,21 @@ async function testProxyConnection(proxyMethod) {
         body: responseBody,
       };
     } catch (fetchError) {
-      clearTimeout(timeoutId);
+      // 에러 발생 시 타임아웃 정리
+      if (timeoutPromise.cleanup) {
+        timeoutPromise.cleanup();
+      }
       throw fetchError;
     }
   } catch (e) {
     console.error(`프록시 연결 테스트 실패 (${proxyMethod}):`, e);
     
     let errorMessage = e.message;
-    if (e.name === 'AbortError') {
-      errorMessage = "연결 시간 초과 (10초)";
-    } else if (e.message.includes('Failed to fetch')) {
-      errorMessage = "네트워크 연결 실패 - CORS 정책 또는 도메인 접근 권한 확인 필요";
+    if (e.message.includes("연결 시간 초과")) {
+      errorMessage = "연결 시간 초과 (10초) - 네트워크 상태 또는 프록시 서버 응답 지연";
+    } else if (e.message.includes("Failed to fetch")) {
+      errorMessage =
+        "네트워크 연결 실패 - CORS 정책 또는 도메인 접근 권한 확인 필요";
     }
     
     return {

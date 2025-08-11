@@ -1077,9 +1077,8 @@ var PROXY_OPTIONS = {
   // 방법 3: 자체 프록시 서버
   customProxy: "https://your-proxy-server.com/claude/",
 
-  // 방법 4: Netlify Functions 프록시
-  netlifyProxy:
-    "https://claude-proxy-demo.netlify.app/.netlify/functions/claude-proxy",
+  // 방법 4: Netlify Functions 프록시 (사용자가 설정)
+  netlifyProxy: "",
 
   // 방법 5: Vercel Functions 프록시
   vercelProxy: "https://your-app.vercel.app/api/claude-proxy",
@@ -1111,8 +1110,12 @@ async function saveProxySettings(method, customUrl = "") {
 
     // 메모리에 설정 저장 (항상 성공)
     CURRENT_PROXY_METHOD = method;
-    if (customUrl && method === "customProxy") {
-      PROXY_OPTIONS.customProxy = customUrl;
+    if (customUrl) {
+      if (method === "customProxy") {
+        PROXY_OPTIONS.customProxy = customUrl;
+      } else if (method === "netlifyProxy") {
+        PROXY_OPTIONS.netlifyProxy = customUrl;
+      }
     }
 
     // UI에 성공 메시지 전송
@@ -1139,8 +1142,12 @@ async function loadProxySettings() {
         const settings = JSON.parse(stored);
         CURRENT_PROXY_METHOD = settings.method || "netlifyProxy";
 
-        if (settings.customUrl && settings.method === "customProxy") {
-          PROXY_OPTIONS.customProxy = settings.customUrl;
+        if (settings.customUrl) {
+          if (settings.method === "customProxy") {
+            PROXY_OPTIONS.customProxy = settings.customUrl;
+          } else if (settings.method === "netlifyProxy") {
+            PROXY_OPTIONS.netlifyProxy = settings.customUrl;
+          }
         }
 
         console.log(
@@ -1172,13 +1179,31 @@ async function loadProxySettings() {
 async function testProxyConnection(proxyMethod) {
   try {
     const proxyUrl = PROXY_OPTIONS[proxyMethod];
-    if (!proxyUrl)
-      return { success: false, error: "프록시 URL이 설정되지 않음" };
+    if (!proxyUrl) {
+      return {
+        success: false,
+        error: `프록시 URL이 설정되지 않음 (${proxyMethod})`,
+      };
+    }
 
+    console.log(`프록시 연결 테스트 시작: ${proxyMethod} -> ${proxyUrl}`);
+
+    // Netlify Functions는 POST 요청을 기대하므로 POST로 테스트
     const testResponse = await fetch(proxyUrl, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        test: true,
+        message: "프록시 연결 테스트",
+      }),
     });
+
+    console.log(
+      `프록시 응답 상태: ${testResponse.status} ${testResponse.statusText}`
+    );
 
     return {
       success: testResponse.ok,
@@ -1186,7 +1211,11 @@ async function testProxyConnection(proxyMethod) {
       statusText: testResponse.statusText,
     };
   } catch (e) {
-    return { success: false, error: e.message };
+    console.error(`프록시 연결 테스트 실패 (${proxyMethod}):`, e);
+    return {
+      success: false,
+      error: `연결 실패: ${e.message}`,
+    };
   }
 }
 

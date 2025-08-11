@@ -194,6 +194,14 @@
           placeholder="https://your-proxy-server.com/claude/"
         />
       </div>
+      <div class="row" id="netlifyProxyRow" style="display: none">
+        <label for="netlifyProxyUrl">Netlify 프록시 URL</label>
+        <input
+          type="text"
+          id="netlifyProxyUrl"
+          placeholder="https://your-site.netlify.app/.netlify/functions/claude-proxy"
+        />
+      </div>
       <div class="row">
         <button class="secondary" id="saveProxyBtn">프록시 설정 저장</button>
         <button class="secondary" id="testProxyBtn">프록시 연결 테스트</button>
@@ -468,7 +476,11 @@
             if (msg.ok && msg.settings) {
               proxyMethod.value = msg.settings.method || "netlifyProxy";
               if (msg.settings.customUrl) {
-                customProxyUrl.value = msg.settings.customUrl;
+                if (msg.settings.method === "customProxy") {
+                  customProxyUrl.value = msg.settings.customUrl;
+                } else if (msg.settings.method === "netlifyProxy") {
+                  netlifyProxyUrl.value = msg.settings.customUrl;
+                }
               }
               updateCustomProxyRow();
             }
@@ -713,8 +725,13 @@
       function updateCustomProxyRow() {
         if (proxyMethod.value === "customProxy") {
           customProxyRow.style.display = "block";
+          netlifyProxyRow.style.display = "none";
+        } else if (proxyMethod.value === "netlifyProxy") {
+          customProxyRow.style.display = "none";
+          netlifyProxyRow.style.display = "block";
         } else {
           customProxyRow.style.display = "none";
+          netlifyProxyRow.style.display = "none";
         }
       }
 
@@ -728,12 +745,20 @@
         saveProxyBtn.addEventListener("click", async () => {
           try {
             const method = proxyMethod.value;
-            const customUrl =
-              method === "customProxy" ? customProxyUrl.value.trim() : "";
+            let customUrl = "";
 
-            if (method === "customProxy" && !customUrl) {
-              setProxyStatus("사용자 정의 프록시 URL을 입력하세요.", "error");
-              return;
+            if (method === "customProxy") {
+              customUrl = customProxyUrl.value.trim();
+              if (!customUrl) {
+                setProxyStatus("사용자 정의 프록시 URL을 입력하세요.", "error");
+                return;
+              }
+            } else if (method === "netlifyProxy") {
+              customUrl = netlifyProxyUrl.value.trim();
+              if (!customUrl) {
+                setProxyStatus("Netlify 프록시 URL을 입력하세요.", "error");
+                return;
+              }
             }
 
             setBusy(true);
@@ -784,6 +809,12 @@
       if (proxyMethod) {
         proxyMethod.value = "netlifyProxy";
         updateCustomProxyRow();
+
+        // Netlify 프록시 기본 URL 설정 (사용자가 수정 가능)
+        if (netlifyProxyUrl) {
+          netlifyProxyUrl.value =
+            "https://your-site.netlify.app/.netlify/functions/claude-proxy";
+        }
       }
 
       // 초기 워크플로우 인디케이터 업데이트

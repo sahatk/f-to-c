@@ -1,0 +1,39 @@
+{
+  "name": "claude-plugin-proxy",
+  "version": "1.0.0",
+  "description": "Claude API 프록시 서버 for Netlify Functions",
+  "main": "netlify/functions/claude-proxy.js",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build step required for Functions'",
+    "deploy": "netlify deploy --prod",
+    "test": "echo 'Add test scripts here'"
+  },
+  "keywords": [
+    "claude",
+    "anthropic",
+    "api",
+    "proxy",
+    "netlify",
+    "functions"
+  ],
+  "author": "Claude Plugin Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "node-fetch": "^3.3.0"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^2.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/claude-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/claude-plugin/issues"
+  },
+  "homepage": "https://github.com/your-username/claude-plugin#readme"
+}

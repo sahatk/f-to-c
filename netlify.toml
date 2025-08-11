@@ -1,0 +1,43 @@
+[build]
+  # Functions 디렉토리 지정
+  functions = "netlify/functions"
+
+  # 빌드 명령어 (필요한 경우)
+  # command = "npm run build"
+
+  # 빌드 출력 디렉토리 (필요한 경우)
+  # publish = "dist"
+
+[functions]
+  # Functions 타임아웃 설정 (초)
+  timeout = 30
+
+  # Functions 메모리 제한 (MB)
+  memory = 1024
+
+[[redirects]]
+  # API 프록시 리다이렉션
+  from = "/api/claude/*"
+  to = "/.netlify/functions/claude-proxy"
+  status = 200
+  force = true
+
+[[redirects]]
+  # CORS preflight 요청 처리
+  from = "/*"
+  to = "/.netlify/functions/claude-proxy"
+  status = 200
+  conditions = {Method = ["OPTIONS"]}
+
+[build.environment]
+  # Node.js 버전 설정
+  NODE_VERSION = "18"
+
+# 헤더 설정
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

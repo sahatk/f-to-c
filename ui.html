@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Claude Prompt Runner</title>
+    <style>
+      :root {
+        --bg: #0b0c0f;
+        --panel: #151821;
+        --border: #2a2f3a;
+        --text: #e6e8ee;
+        --muted: #a7adbb;
+        --accent: #6ea8fe;
+        --accent-strong: #4c8dff;
+        --danger: #ff5d5d;
+        --success: #4caf50;
+        --warning: #ffa726;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI,
+          Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background: var(--bg);
+        color: var(--text);
+      }
+      .section {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      .section h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        color: var(--muted);
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+      label {
+        font-size: 12px;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 6px;
+      }
+      input[type="password"],
+      textarea {
+        width: 100%;
+        background: #0f121a;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .row + .row {
+        margin-top: 8px;
+      }
+      button {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      button:hover:not(:disabled) {
+        background: var(--accent-strong);
+      }
+      button.secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      button.secondary:hover:not(:disabled) {
+        background: var(--border);
+      }
+      button.analysis {
+        background: var(--warning);
+        color: #fff;
+      }
+      button.analysis:hover:not(:disabled) {
+        background: #ff9800;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .status {
+        font-size: 12px;
+        margin-top: 8px;
+        color: var(--muted);
+      }
+      .status.success {
+        color: var(--success);
+      }
+      .status.error {
+        color: var(--danger);
+      }
+      .status.warning {
+        color: var(--warning);
+      }
+      .result-box {
+        background: #0f121a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        max-height: 220px;
+        overflow: auto;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .workflow-indicator {
+        background: #1a1d29;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 12px;
+        margin: 8px 0;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .workflow-indicator.active {
+        background: #2d4a22;
+        border-color: var(--success);
+        color: var(--success);
+      }
+      .analysis-info {
+        background: #2a2416;
+        border: 1px solid #4a3c1a;
+        border-radius: 6px;
+        padding: 8px;
+        margin: 8px 0;
+        font-size: 11px;
+        color: var(--warning);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="section" id="settings">
+      <h2>API 설정</h2>
+      <label for="apiKey">Claude API 키</label>
+      <div class="row">
+        <input type="password" id="apiKey" placeholder="sk-ant-api03..." />
+      </div>
+      <div class="row">
+        <button id="saveKeyBtn">저장</button>
+        <button class="secondary" id="testKeyBtn">테스트</button>
+        <span class="status" id="keyStatus"></span>
+      </div>
+    </div>
+
+    <div class="section" id="proxySettings">
+      <h2>프록시 서버 설정</h2>
+      <label for="proxyMethod">프록시 방법 선택</label>
+      <div class="row">
+        <select id="proxyMethod">
+          <option value="corsProxy">CORS 프록시 (cors-anywhere)</option>
+          <option value="cloudflareProxy">Cloudflare Workers</option>
+          <option value="customProxy">사용자 정의 프록시</option>
+          <option value="netlifyProxy" selected>Netlify Functions</option>
+          <option value="vercelProxy">Vercel Functions</option>
+        </select>
+      </div>
+      <div class="row" id="customProxyRow" style="display: none">
+        <input
+          type="text"
+          id="customProxyUrl"
+          placeholder="https://your-proxy-server.com/claude/"
+        />
+      </div>
+      <div class="row">
+        <button class="secondary" id="saveProxyBtn">프록시 설정 저장</button>
+        <button class="secondary" id="testProxyBtn">프록시 연결 테스트</button>
+        <span class="status" id="proxyStatus"></span>
+      </div>
+      <div class="analysis-info" id="proxyInfo">
+        <strong>💡 프록시 서버 사용 이유:</strong>
+        <div style="margin-top: 8px; font-size: 10px; line-height: 1.4">
+          • CORS 정책으로 인한 직접 API 호출 제한
+          <br />
+          • 회사/기관 네트워크의 방화벽 정책
+          <br />
+          • 지역별 API 접근 제한
+          <br />
+          • 프록시를 통한 우회 연결
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="prompt">
+      <h2>프롬프트</h2>
+      <label for="promptInput">명령 입력</label>
+      <textarea
+        id="promptInput"
+        placeholder="프롬프트를 입력하세요..."
+      ></textarea>
+      <div class="split" style="margin-top: 8px">
+        <div class="row">
+          <button id="runBtn">실행</button>
+          <button class="secondary" id="clearBtn">지우기</button>
+        </div>
+        <span class="status" id="runStatus"></span>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <div class="result-box" id="result"></div>
+      </div>
+    </div>
+
+    <div class="section" id="mcp">
+      <h2>MCP 데이터</h2>
+      <div class="workflow-indicator" id="workflowStep1">
+        1단계: Figma 선택 영역 → MCP 데이터 생성
+      </div>
+      <div class="split" style="margin-top: 8px">
+        <div class="row">
+          <button id="mcpBtn">선택 → MCP 데이터 생성</button>
+        </div>
+        <span class="status" id="mcpStatus"></span>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <div class="result-box" id="mcpResult"></div>
+      </div>
+    </div>
+
+    <div class="section" id="htmlSection">
+      <h2>HTML 코드 결과</h2>
+      <div class="workflow-indicator" id="workflowStep2">
+        2단계: MCP 데이터 → HTML 코드 생성
+      </div>
+      <div class="analysis-info" id="htmlAnalysisInfo" style="display: none">
+        <strong>🔍 HTML 구조 분석 결과:</strong>
+        <div
+          id="htmlAnalysisResult"
+          style="margin-top: 8px; font-size: 10px; line-height: 1.4"
+        ></div>
+      </div>
+      <div class="split" style="margin-top: 8px">
+        <div class="row">
+          <button class="secondary" id="mcpHtmlBtn">Claude로 HTML 생성</button>
+          <button class="secondary" id="analyzeStructureBtn">구조 분석</button>
+          <button class="secondary" id="copyHtmlBtn">HTML 복사</button>
+        </div>
+        <span class="status" id="htmlStatus"></span>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <div class="result-box" id="htmlResult"></div>
+      </div>
+    </div>
+
+    <div class="section" id="scssSection">
+      <h2>SCSS 코드 결과</h2>
+      <div class="workflow-indicator" id="workflowStep3">
+        3단계: HTML + MCP 데이터 → SCSS 코드 생성
+      </div>
+      <div class="analysis-info" id="analysisInfo" style="display: none">
+        🔍 HTML 구조와 MCP 데이터를 분석하여 정확한 SCSS를 생성합니다. HTML의
+        클래스명과 MCP의 스타일 정보가 자동으로 매칭됩니다.
+      </div>
+      <div class="split" style="margin-top: 8px">
+        <div class="row">
+          <button class="secondary" id="mcpScssBtn">Claude로 SCSS 생성</button>
+          <button class="analysis" id="analyzeHtmlBtn">HTML 분석 → SCSS</button>
+          <button class="secondary" id="copyScssBtn">SCSS 복사</button>
+        </div>
+        <span class="status" id="scssStatus"></span>
+      </div>
+      <div class="row" style="margin-top: 8px">
+        <div class="result-box" id="scssResult"></div>
+      </div>
+    </div>
+
+    <script>
+      const apiKeyInput = document.getElementById("apiKey");
+      const saveKeyBtn = document.getElementById("saveKeyBtn");
+      const testKeyBtn = document.getElementById("testKeyBtn");
+      const keyStatus = document.getElementById("keyStatus");
+
+      const promptInput = document.getElementById("promptInput");
+      const runBtn = document.getElementById("runBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const runStatus = document.getElementById("runStatus");
+      const resultBox = document.getElementById("result");
+      const mcpBtn = document.getElementById("mcpBtn");
+      const mcpStatus = document.getElementById("mcpStatus");
+      const mcpResult = document.getElementById("mcpResult");
+      const mcpHtmlBtn = document.getElementById("mcpHtmlBtn");
+      const mcpScssBtn = document.getElementById("mcpScssBtn");
+      const analyzeHtmlBtn = document.getElementById("analyzeHtmlBtn");
+      const analyzeStructureBtn = document.getElementById(
+        "analyzeStructureBtn"
+      );
+      const htmlStatus = document.getElementById("htmlStatus");
+      const scssStatus = document.getElementById("scssStatus");
+      const htmlResult = document.getElementById("htmlResult");
+      const scssResult = document.getElementById("scssResult");
+      const copyHtmlBtn = document.getElementById("copyHtmlBtn");
+      const copyScssBtn = document.getElementById("copyScssBtn");
+      const analysisInfo = document.getElementById("analysisInfo");
+      const htmlAnalysisInfo = document.getElementById("htmlAnalysisInfo");
+      const htmlAnalysisResult = document.getElementById("htmlAnalysisResult");
+
+      // 프록시 설정 관련 요소들
+      const proxyMethod = document.getElementById("proxyMethod");
+      const customProxyRow = document.getElementById("customProxyRow");
+      const customProxyUrl = document.getElementById("customProxyUrl");
+      const saveProxyBtn = document.getElementById("saveProxyBtn");
+      const testProxyBtn = document.getElementById("testProxyBtn");
+      const proxyStatus = document.getElementById("proxyStatus");
+
+      // 워크플로우 인디케이터 요소들
+      const workflowStep1 = document.getElementById("workflowStep1");
+      const workflowStep2 = document.getElementById("workflowStep2");
+      const workflowStep3 = document.getElementById("workflowStep3");
+
+      function post(message) {
+        parent.postMessage({ pluginMessage: message }, "*");
+      }
+
+      function setKeyStatus(text, type) {
+        keyStatus.textContent = text || "";
+        keyStatus.className = "status" + (type ? " " + type : "");
+      }
+
+      function setRunStatus(text, type) {
+        runStatus.textContent = text || "";
+        runStatus.className = "status" + (type ? " " + type : "");
+      }
+
+      function setBusy(isBusy) {
+        saveKeyBtn.disabled = isBusy;
+        testKeyBtn.disabled = isBusy;
+        runBtn.disabled = isBusy;
+        if (mcpBtn) mcpBtn.disabled = isBusy;
+        if (mcpHtmlBtn) mcpHtmlBtn.disabled = isBusy;
+        if (mcpScssBtn) mcpScssBtn.disabled = isBusy;
+        if (analyzeHtmlBtn) analyzeHtmlBtn.disabled = isBusy;
+        if (analyzeStructureBtn) analyzeStructureBtn.disabled = isBusy;
+        if (saveProxyBtn) saveProxyBtn.disabled = isBusy;
+        if (testProxyBtn) testProxyBtn.disabled = isBusy;
+      }
+
+      function setMcpStatus(text, type) {
+        mcpStatus.textContent = text || "";
+        mcpStatus.className = "status" + (type ? " " + type : "");
+      }
+
+      function setProxyStatus(text, type) {
+        proxyStatus.textContent = text || "";
+        proxyStatus.className = "status" + (type ? " " + type : "");
+      }
+
+      function updateWorkflowIndicators() {
+        // MCP 데이터가 있는지 확인
+        const hasMcpData = mcpResult.textContent.trim().length > 0;
+        const hasHtmlCode = htmlResult.textContent.trim().length > 0;
+        const hasScssCode = scssResult.textContent.trim().length > 0;
+
+        // 단계별 활성화 상태 업데이트
+        workflowStep1.className = hasMcpData
+          ? "workflow-indicator active"
+          : "workflow-indicator";
+        workflowStep2.className = hasHtmlCode
+          ? "workflow-indicator active"
+          : "workflow-indicator";
+        workflowStep3.className = hasScssCode
+          ? "workflow-indicator active"
+          : "workflow-indicator";
+
+        // HTML 분석 버튼 표시/숨김
+        if (hasHtmlCode && hasMcpData) {
+          analyzeHtmlBtn.style.display = "inline-block";
+          analysisInfo.style.display = "block";
+        } else {
+          analyzeHtmlBtn.style.display = "none";
+          analysisInfo.style.display = "none";
+        }
+      }
+
+      window.onmessage = (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg) return;
+
+        switch (msg.type) {
+          case "apiKeyValue": {
+            apiKeyInput.value = msg.apiKey || "";
+            break;
+          }
+          case "apiKeySaved": {
+            setBusy(false);
+            if (msg.ok === false) {
+              setKeyStatus("저장 실패: " + (msg.error || "오류"), "error");
+            } else {
+              // persisted=false라면 clientStorage는 실패했으나 로컬 저장은 성공한 상태
+              if (msg.persisted === false && msg.warning) {
+                setKeyStatus(
+                  "로컬로 저장되었습니다. (클라우드 저장 불가) — " +
+                    msg.warning,
+                  "success"
+                );
+              } else {
+                setKeyStatus("API 키가 저장되었습니다.", "success");
+              }
+            }
+            break;
+          }
+          case "apiKeyTestResult": {
+            setBusy(false);
+            if (msg.ok) setKeyStatus("API 키 테스트 성공", "success");
+            else
+              setKeyStatus(
+                "API 키 테스트 실패: " + (msg.error || "오류"),
+                "error"
+              );
+            break;
+          }
+          case "proxySettingsSaved": {
+            setBusy(false);
+            if (msg.ok) {
+              setProxyStatus("프록시 설정이 저장되었습니다.", "success");
+            } else {
+              setProxyStatus(
+                "프록시 설정 저장 실패: " + (msg.error || "오류"),
+                "error"
+              );
+            }
+            break;
+          }
+          case "proxySettingsLoaded": {
+            if (msg.ok && msg.settings) {
+              proxyMethod.value = msg.settings.method || "netlifyProxy";
+              if (msg.settings.customUrl) {
+                customProxyUrl.value = msg.settings.customUrl;
+              }
+              updateCustomProxyRow();
+            }
+            break;
+          }
+          case "proxyConnectionTestResult": {
+            setBusy(false);
+            if (msg.ok) {
+              setProxyStatus(`프록시 연결 성공 (${msg.status})`, "success");
+            } else {
+              setProxyStatus(
+                "프록시 연결 실패: " + (msg.error || "오류"),
+                "error"
+              );
+            }
+            break;
+          }
+          case "promptResult": {
+            setBusy(false);
+            if (msg.ok) {
+              resultBox.textContent = msg.text || "";
+              setRunStatus("완료", "success");
+            } else {
+              resultBox.textContent = "";
+              setRunStatus("실패: " + (msg.error || "오류"), "error");
+            }
+            break;
+          }
+          case "mcpDataResult": {
+            setBusy(false);
+            if (msg.ok) {
+              mcpResult.textContent = msg.json || "";
+              setMcpStatus("생성 완료", "success");
+            } else {
+              mcpResult.textContent = "";
+              setMcpStatus("실패: " + (msg.error || "오류"), "error");
+            }
+            updateWorkflowIndicators();
+            break;
+          }
+          case "claudeHtmlResult": {
+            setBusy(false);
+            if (msg.ok) {
+              htmlResult.textContent = msg.code || "";
+              htmlStatus.textContent = "완료";
+              htmlStatus.className = "status success";
+
+              // HTML 구조 분석 정보 표시
+              if (msg.analysis) {
+                htmlAnalysisResult.textContent = msg.analysis;
+                htmlAnalysisInfo.style.display = "block";
+              }
+            } else {
+              htmlResult.textContent = "";
+              htmlStatus.textContent = "실패: " + (msg.error || "오류");
+              htmlStatus.className = "status error";
+              htmlAnalysisInfo.style.display = "none";
+            }
+            updateWorkflowIndicators();
+            break;
+          }
+          case "claudeScssResult": {
+            setBusy(false);
+            if (msg.ok) {
+              scssResult.textContent = msg.code || "";
+              scssStatus.textContent = "완료";
+              scssStatus.className = "status success";
+            } else {
+              scssResult.textContent = "";
+              scssStatus.textContent = "실패: " + (msg.error || "오류");
+              scssStatus.className = "status error";
+            }
+            updateWorkflowIndicators();
+            break;
+          }
+          default:
+            break;
+        }
+      };
+
+      // Load saved key on init
+      try {
+        const localKey = localStorage.getItem("claude_api_key") || "";
+        if (localKey) apiKeyInput.value = localKey;
+      } catch (e) {}
+      post({ type: "getApiKey" });
+
+      saveKeyBtn.addEventListener("click", () => {
+        const apiKey = (apiKeyInput.value || "").trim();
+        if (!apiKey) {
+          setKeyStatus("API 키를 입력하세요.", "error");
+          return;
+        }
+        setBusy(true);
+        setKeyStatus("저장 중...", "");
+        try {
+          localStorage.setItem("claude_api_key", apiKey);
+        } catch (e) {}
+        post({ type: "setApiKey", apiKey });
+      });
+
+      testKeyBtn.addEventListener("click", () => {
+        const apiKey = (apiKeyInput.value || "").trim();
+        if (!apiKey) {
+          setKeyStatus("API 키를 입력하세요.", "error");
+          return;
+        }
+        setBusy(true);
+        setKeyStatus("테스트 중...", "");
+        post({ type: "testApiKey", apiKey });
+      });
+
+      runBtn.addEventListener("click", () => {
+        const prompt = (promptInput.value || "").trim();
+        if (!prompt) {
+          setRunStatus("프롬프트를 입력하세요.", "error");
+          return;
+        }
+        setBusy(true);
+        setRunStatus("실행 중...", "");
+        const apiKey = (apiKeyInput.value || "").trim();
+        post({ type: "runPrompt", prompt, apiKey });
+      });
+
+      clearBtn.addEventListener("click", () => {
+        promptInput.value = "";
+        resultBox.textContent = "";
+        setRunStatus("", "");
+      });
+
+      // MCP 버튼: 선택 영역을 MCP JSON으로 변환 요청
+      if (mcpBtn) {
+        mcpBtn.addEventListener("click", () => {
+          setBusy(true);
+          setMcpStatus("생성 중...", "");
+          mcpResult.textContent = "";
+          post({ type: "generateMcpData" });
+        });
+      }
+
+      if (mcpHtmlBtn) {
+        mcpHtmlBtn.addEventListener("click", () => {
+          setBusy(true);
+          htmlResult.textContent = "";
+          htmlStatus.textContent = "생성 중...";
+          htmlStatus.className = "status";
+          const apiKey = (apiKeyInput.value || "").trim();
+          const userPrompt = (promptInput.value || "").trim();
+          post({ type: "claudeGenerateHtml", apiKey, userPrompt });
+        });
+      }
+
+      if (mcpScssBtn) {
+        mcpScssBtn.addEventListener("click", () => {
+          setBusy(true);
+          scssResult.textContent = "";
+          scssStatus.textContent = "생성 중...";
+          scssStatus.className = "status";
+          const apiKey = (apiKeyInput.value || "").trim();
+          const userPrompt = (promptInput.value || "").trim();
+          post({ type: "claudeGenerateScss", apiKey, userPrompt });
+        });
+      }
+
+      // HTML 분석을 통한 SCSS 생성 버튼
+      if (analyzeHtmlBtn) {
+        analyzeHtmlBtn.addEventListener("click", () => {
+          const htmlCode = htmlResult.textContent.trim();
+          if (!htmlCode) {
+            scssStatus.textContent = "HTML 코드가 없습니다.";
+            scssStatus.className = "status error";
+            return;
+          }
+
+          setBusy(true);
+          scssResult.textContent = "";
+          scssStatus.textContent = "HTML 분석 중...";
+          scssStatus.className = "status warning";
+
+          const apiKey = (apiKeyInput.value || "").trim();
+          const userPrompt = (promptInput.value || "").trim();
+          post({
+            type: "analyzeHtmlForScss",
+            apiKey,
+            userPrompt,
+            htmlCode,
+          });
+        });
+      }
+
+      // HTML 구조 분석 버튼
+      if (analyzeStructureBtn) {
+        analyzeStructureBtn.addEventListener("click", () => {
+          const mcpData = mcpResult.textContent.trim();
+          if (!mcpData) {
+            htmlStatus.textContent = "MCP 데이터가 없습니다.";
+            htmlStatus.className = "status error";
+            return;
+          }
+
+          try {
+            setBusy(true);
+            htmlStatus.textContent = "구조 분석 중...";
+            htmlStatus.className = "status warning";
+
+            post({ type: "analyzeMcpStructure" });
+          } catch (e) {
+            htmlStatus.textContent = "분석 실패";
+            htmlStatus.className = "status error";
+            setBusy(false);
+          }
+        });
+      }
+
+      if (copyHtmlBtn) {
+        copyHtmlBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(htmlResult.textContent || "");
+            htmlStatus.textContent = "복사됨";
+            htmlStatus.className = "status success";
+          } catch (e) {
+            htmlStatus.textContent = "복사 실패";
+            htmlStatus.className = "status error";
+          }
+        });
+      }
+
+      if (copyScssBtn) {
+        copyScssBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(scssResult.textContent || "");
+            scssStatus.textContent = "복사됨";
+            scssStatus.className = "status success";
+          } catch (e) {
+            scssStatus.textContent = "복사 실패";
+            scssStatus.className = "status error";
+          }
+        });
+      }
+
+      // 프록시 설정 관련 함수들
+      function updateCustomProxyRow() {
+        if (proxyMethod.value === "customProxy") {
+          customProxyRow.style.display = "block";
+        } else {
+          customProxyRow.style.display = "none";
+        }
+      }
+
+      // 프록시 방법 변경 시 사용자 정의 프록시 URL 입력 필드 표시/숨김
+      if (proxyMethod) {
+        proxyMethod.addEventListener("change", updateCustomProxyRow);
+      }
+
+      // 프록시 설정 저장 버튼
+      if (saveProxyBtn) {
+        saveProxyBtn.addEventListener("click", () => {
+          const method = proxyMethod.value;
+          const customUrl =
+            method === "customProxy" ? customProxyUrl.value.trim() : "";
+
+          if (method === "customProxy" && !customUrl) {
+            setProxyStatus("사용자 정의 프록시 URL을 입력하세요.", "error");
+            return;
+          }
+
+          setBusy(true);
+          setProxyStatus("프록시 설정 저장 중...", "");
+          post({ type: "saveProxySettings", method, customUrl });
+        });
+      }
+
+      // 프록시 연결 테스트 버튼
+      if (testProxyBtn) {
+        testProxyBtn.addEventListener("click", () => {
+          const method = proxyMethod.value;
+          setBusy(true);
+          setProxyStatus("프록시 연결 테스트 중...", "");
+          post({ type: "testProxyConnection", proxyMethod: method });
+        });
+      }
+
+      // 초기 프록시 설정 로드
+      post({ type: "loadProxySettings" });
+
+      // 기본값 설정 (설정이 없을 경우)
+      if (proxyMethod) {
+        proxyMethod.value = "netlifyProxy";
+        updateCustomProxyRow();
+      }
+
+      // 초기 워크플로우 인디케이터 업데이트
+      updateWorkflowIndicators();
+    </script>
+  </body>
+</html>

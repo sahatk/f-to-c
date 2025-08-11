@@ -3,6 +3,14 @@
 // 배포 방법: netlify/functions/ 폴더에 파일을 생성하고 Netlify에 배포
 
 exports.handler = async function (event, context) {
+  // 디버깅 로그 추가
+  console.log("프록시 함수 호출됨:", {
+    method: event.httpMethod,
+    path: event.path,
+    headers: event.headers,
+    body: event.body
+  });
+
   // CORS 헤더 설정 (Figma 플러그인 환경에 최적화)
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -10,6 +18,9 @@ exports.handler = async function (event, context) {
     "Access-Control-Allow-Headers": "*",
     "Access-Control-Max-Age": "86400",
     "Access-Control-Allow-Credentials": "true",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0"
   };
 
   // OPTIONS 요청 처리 (preflight)

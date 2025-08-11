@@ -1186,7 +1186,7 @@ async function loadProxySettings() {
 // 프록시 서버 상태 확인
 async function testProxyConnection(proxyMethod) {
   let timeoutId = null; // 타임아웃 ID를 함수 상단에서 선언
-  
+
   try {
     const proxyUrl = PROXY_OPTIONS[proxyMethod];
     if (!proxyUrl) {
@@ -1220,10 +1220,10 @@ async function testProxyConnection(proxyMethod) {
           timestamp: new Date().toISOString(),
         }),
       });
-      
+
       // 타임아웃과 fetch 요청을 경쟁시킴
       const testResponse = await Promise.race([fetchPromise, timeoutPromise]);
-      
+
       // 성공 시 타임아웃 정리
       if (timeoutId) {
         clearTimeout(timeoutId);
@@ -1263,9 +1263,9 @@ async function testProxyConnection(proxyMethod) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
-    
+
     console.error(`프록시 연결 테스트 실패 (${proxyMethod}):`, e);
-    
+
     let errorMessage = e.message;
     if (e.message.includes("연결 시간 초과")) {
       errorMessage =
@@ -1274,7 +1274,7 @@ async function testProxyConnection(proxyMethod) {
       errorMessage =
         "네트워크 연결 실패 - CORS 정책 또는 도메인 접근 권한 확인 필요";
     }
-    
+
     return {
       success: false,
       error: `연결 실패: ${errorMessage}`,

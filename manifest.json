@@ -9,7 +9,9 @@
     "allowedDomains": [
       "https://api.anthropic.com",
       "https://*.netlify.app",
-      "https://*.netlify.com"
+      "https://*.netlify.com",
+      "https://f-to-c.netlify.app",
+      "https://f-to-c.netlify.com"
     ]
   }
 }
